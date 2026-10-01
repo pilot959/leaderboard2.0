@@ -280,7 +280,7 @@ function renderLeaderboard() {
 const playerDialog = document.getElementById("playerDialog");
 const playerForm = document.getElementById("playerForm");
 
-document.getElementById("addBtn").addEventListener("click", () => {
+document.getElementById("addpageBtn").addEventListener("click", () => {
   document.getElementById("dialogTitle").textContent = "Add Player";
   document.getElementById("playerId").value = "";
   document.getElementById("playerName").value = "";
