@@ -280,7 +280,17 @@ function renderLeaderboard() {
 const playerDialog = document.getElementById("playerDialog");
 const playerForm = document.getElementById("playerForm");
 
-document.getElementById("addpageBtn").addEventListener("click", () => {
+document.getElementById("addPageBtn").addEventListener("click", () => {
+  pageDialogMode = "new";
+
+  document.getElementById("pageDialogTitle").textContent =
+    "New Leaderboard";
+
+  document.getElementById("pageName").value = "";
+  document.getElementById("pageSubtitle").value = "";
+
+  pageDialog.showModal();
+});
   document.getElementById("dialogTitle").textContent = "Add Player";
   document.getElementById("playerId").value = "";
   document.getElementById("playerName").value = "";
