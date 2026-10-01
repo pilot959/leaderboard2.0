@@ -1,1 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>My Leaderboards</title>
+  <link rel="stylesheet" href="style.css">
+</head>
 
+<body>
+
+  <div class="app">
+
+    <aside class="sidebar">
+      <div class="brand">🏆 Leaderboards</div>
+
+      <div class="page-label">LEADERBOARDS</div>
+
+      <div id="pages"></div>
+
+      <button id="addPageBtn" class="add-page">
+        ＋ New Leaderboard
+      </button>
+    </aside>
+
+
+    <main class="main">
+
+      <header class="hero">
+
+        <div>
+          <p class="eyebrow">LEADERBOARD</p>
+
+          <h1 id="title"></h1>
+
+          <p id="subtitle"></p>
+        </div>
+
+        <div class="header-actions">
+          <button id="renamePageBtn" class="secondary">
+            ✏ Rename
+          </button>
+        </div>
+
+      </header>
+
+
+      <section class="card controls">
+
+        <div class="control-group">
+          <label for="search">Search</label>
+
+          <input
+            id="search"
+            type="search"
+            placeholder="Find a player..."
+          >
+        </div>
+
+
+        <div class="control-group">
+          <label for="sort">Sort</label>
+
+          <select id="sort">
+
+            <option value="scoreDesc">
+              Score: high → low
+            </option>
+
+            <option value="scoreAsc">
+              Score: low → high
+            </option>
+
+            <option value="name">
+              Name
+            </option>
+
+          </select>
+        </div>
+
+
+        <button id="addBtn" class="primary">
+          ＋ Add Player
+        </button>
+
+      </section>
+
+
+      <section class="card table-card">
+
+        <div class="table-head">
+          <span>Rank</span>
+          <span>Player</span>
+          <span>Score</span>
+          <span>Action</span>
+        </div>
+
+        <div id="leaderboard"></div>
+
+        <div id="empty" class="empty hidden">
+          No players found.
+        </div>
+
+      </section>
+
+
+      <p class="hint">
+        Changes are saved automatically in this browser.
+      </p>
+
+    </main>
+
+  </div>
+
+
+  <!-- Add/Edit Player -->
+
+  <dialog id="playerDialog">
+
+    <form method="dialog" id="playerForm" class="dialog">
+
+      <h2 id="dialogTitle">
+        Add Player
+      </h2>
+
+      <input
+        type="hidden"
+        id="playerId"
+      >
+
+      <label>
+        Player name
+
+        <input
+          id="playerName"
+          required
+          maxlength="40"
+          placeholder="Player 1"
+        >
+      </label>
+
+
+      <label>
+        Score
+
+        <input
+          id="playerScore"
+          required
+          type="number"
+          step="any"
+          placeholder="100"
+        >
+      </label>
+
+
+      <div class="dialog-actions">
+
+        <button
+          value="cancel"
+          class="secondary"
+        >
+          Cancel
+        </button>
+
+        <button
+          value="save"
+          class="primary"
+        >
+          Save
+        </button>
+
+      </div>
+
+    </form>
+
+  </dialog>
+
+
+  <!-- New/Rename Leaderboard -->
+
+  <dialog id="pageDialog">
+
+    <form method="dialog" id="pageForm" class="dialog">
+
+      <h2 id="pageDialogTitle">
+        New Leaderboard
+      </h2>
+
+
+      <label>
+        Leaderboard name
+
+        <input
+          id="pageName"
+          required
+          maxlength="40"
+          placeholder="Speedruns"
+        >
+      </label>
+
+
+      <label>
+        Description
+
+        <input
+          id="pageSubtitle"
+          maxlength="100"
+          placeholder="Best times"
+        >
+      </label>
+
+
+      <div class="dialog-actions">
+
+        <button
+          value="cancel"
+          class="secondary"
+        >
+          Cancel
+        </button>
+
+        <button
+          value="save"
+          class="primary"
+        >
+          Save
+        </button>
+
+      </div>
+
+    </form>
+
+  </dialog>
+
+
+  <script src="script.js"></script>
+
+</body>
+</html>
