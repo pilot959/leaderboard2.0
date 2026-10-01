@@ -108,6 +108,7 @@ function renderPages() {
 
 function renderLeaderboard() {
   const current = getCurrentLeaderboard();
+
   const leaderboard = document.getElementById("leaderboard");
   const empty = document.getElementById("empty");
 
@@ -116,6 +117,87 @@ function renderLeaderboard() {
     empty.classList.remove("hidden");
     return;
   }
+
+  const searchText = document
+    .getElementById("search")
+    .value
+    .toLowerCase()
+    .trim();
+
+  let players = [...current.players];
+
+  if (searchText) {
+    players = players.filter(player =>
+      player.name.toLowerCase().includes(searchText)
+    );
+  }
+
+  // FASTEST TIME = #1
+  players.sort(function(a, b) {
+    const aTime = Number.parseFloat(a.score);
+    const bTime = Number.parseFloat(b.score);
+
+    return aTime - bTime;
+  });
+
+  if (players.length === 0) {
+    leaderboard.innerHTML = "";
+    empty.classList.remove("hidden");
+    return;
+  }
+
+  empty.classList.add("hidden");
+
+  leaderboard.innerHTML = players.map(function(player, index) {
+    return `
+      <div class="row">
+
+        <span class="rank">
+          ${index + 1}
+        </span>
+
+        <span class="player">
+          ${escapeHTML(player.name)}
+        </span>
+
+        <span class="score">
+          ${formatTime(player.score)}
+        </span>
+
+        <span class="actions">
+
+          <button
+            class="secondary edit-player"
+            data-id="${player.id}"
+          >
+            ✏ Edit
+          </button>
+
+          <button
+            class="danger delete-player"
+            data-id="${player.id}"
+          >
+            🗑
+          </button>
+
+        </span>
+
+      </div>
+    `;
+  }).join("");
+
+  document.querySelectorAll(".edit-player").forEach(function(button) {
+    button.addEventListener("click", function() {
+      editPlayer(button.dataset.id);
+    });
+  });
+
+  document.querySelectorAll(".delete-player").forEach(function(button) {
+    button.addEventListener("click", function() {
+      deletePlayer(button.dataset.id);
+    });
+  });
+}
 
   const searchText = document
     .getElementById("search")
