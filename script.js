@@ -1,890 +1,388 @@
-// ==========================================
-// MULTI-LEADERBOARD SCRIPT
-// ==========================================
-
 const STORAGE_KEY = "myMultiLeaderboard";
 
-
-// ------------------------------------------
-// STARTING DATA
-// ------------------------------------------
-
-const startingData = {
-
-    activeLeaderboard: "speedruns",
-
-    leaderboards: [
-
-        {
-            id: "speedruns",
-            name: "Speedruns",
-            description: "Best times and scores",
-
-            players: [
-                {
-                    id: "player1",
-                    name: "Alex",
-                    score: 980
-                },
-
-                {
-                    id: "player2",
-                    name: "Jordan",
-                    score: 875
-                },
-
-                {
-                    id: "player3",
-                    name: "Sam",
-                    score: 760
-                }
-            ]
-        },
-
-
-        {
-            id: "arcade",
-            name: "Arcade",
-            description: "Highest arcade scores",
-
-            players: [
-                {
-                    id: "player4",
-                    name: "Taylor",
-                    score: 1250
-                },
-
-                {
-                    id: "player5",
-                    name: "Morgan",
-                    score: 920
-                }
-            ]
-        }
-
-    ]
-
+const defaultData = {
+  activeLeaderboard: "speedruns",
+  leaderboards: [
+    {
+      id: "speedruns",
+      name: "Speedruns",
+      description: "Best times and scores",
+      players: [
+        { id: "1", name: "Alex", score: 980 },
+        { id: "2", name: "Jordan", score: 875 },
+        { id: "3", name: "Sam", score: 760 }
+      ]
+    },
+    {
+      id: "arcade",
+      name: "Arcade",
+      description: "Highest arcade scores",
+      players: [
+        { id: "4", name: "Taylor", score: 1250 },
+        { id: "5", name: "Morgan", score: 920 }
+      ]
+    }
+  ]
 };
 
+let data = loadData();
+let pageDialogMode = "new";
 
-// ------------------------------------------
-// LOAD DATA
-// ------------------------------------------
+function loadData() {
+  const saved = localStorage.getItem(STORAGE_KEY);
 
-let data =
-    JSON.parse(localStorage.getItem(STORAGE_KEY))
-    || startingData;
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch {
+      return structuredClone(defaultData);
+    }
+  }
 
-
-// ------------------------------------------
-// HELPER FUNCTIONS
-// ------------------------------------------
+  return structuredClone(defaultData);
+}
 
 function saveData() {
-
-    localStorage.setItem(
-        STORAGE_KEY,
-        JSON.stringify(data)
-    );
-
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
 }
-
-
-function getCurrentLeaderboard() {
-
-    return data.leaderboards.find(
-        leaderboard =>
-            leaderboard.id === data.activeLeaderboard
-    );
-
-}
-
 
 function createID() {
-
-    return Date.now().toString() +
-        Math.random().toString(36).substring(2);
-
+  return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
-
-function escapeHTML(text) {
-
-    return text.replace(
-        /[&<>"']/g,
-
-        function(character) {
-
-            const characters = {
-
-                "&": "&amp;",
-                "<": "&lt;",
-                ">": "&gt;",
-                '"': "&quot;",
-                "'": "&#039;"
-
-            };
-
-            return characters[character];
-
-        }
-    );
-
+function escapeHTML(value) {
+  return String(value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#039;");
 }
 
-
-// ------------------------------------------
-// RENDER EVERYTHING
-// ------------------------------------------
+function getCurrentLeaderboard() {
+  return data.leaderboards.find(
+    leaderboard => leaderboard.id === data.activeLeaderboard
+  );
+}
 
 function render() {
+  renderPages();
+  renderLeaderboard();
 
-    renderPages();
+  const current = getCurrentLeaderboard();
 
-    renderLeaderboard();
-
+  if (current) {
+    document.title = `${current.name} - Leaderboards`;
+    document.getElementById("title").textContent = current.name;
+    document.getElementById("subtitle").textContent = current.description;
+  }
 }
-
-
-// ------------------------------------------
-// RENDER LEADERBOARD PAGES
-// ------------------------------------------
 
 function renderPages() {
+  const pages = document.getElementById("pages");
 
-    const pages = document.getElementById("pages");
+  pages.innerHTML = data.leaderboards.map(leaderboard => `
+    <div
+      class="page ${leaderboard.id === data.activeLeaderboard ? "active" : ""}"
+      data-id="${leaderboard.id}"
+    >
+      <span class="dot"></span>
+      <span class="page-name">${escapeHTML(leaderboard.name)}</span>
+      <button class="trash" title="Delete leaderboard">🗑</button>
+    </div>
+  `).join("");
 
-    pages.innerHTML = "";
+  document.querySelectorAll(".page").forEach(page => {
+    page.addEventListener("click", () => {
+      data.activeLeaderboard = page.dataset.id;
+      saveData();
+      render();
+    });
 
-
-    data.leaderboards.forEach(
-
-        function(leaderboard) {
-
-            const page = document.createElement("div");
-
-            page.className = "page";
-
-
-            if (
-                leaderboard.id ===
-                data.activeLeaderboard
-            ) {
-
-                page.classList.add("active");
-
-            }
-
-
-            page.innerHTML = `
-
-                <span class="dot">
-                    📄
-                </span>
-
-                <span class="page-name">
-                    ${escapeHTML(leaderboard.name)}
-                </span>
-
-            `;
-
-
-            // Switch leaderboard
-
-            page.onclick = function() {
-
-                data.activeLeaderboard =
-                    leaderboard.id;
-
-                saveData();
-
-                document.getElementById("search").value = "";
-
-                render();
-
-            };
-
-
-            // Delete button
-
-            const deleteButton =
-                document.createElement("button");
-
-            deleteButton.className = "trash";
-
-            deleteButton.textContent = "✕";
-
-            deleteButton.title =
-                "Delete leaderboard";
-
-
-            deleteButton.onclick = function(event) {
-
-                event.stopPropagation();
-
-                deleteLeaderboard(
-                    leaderboard.id
-                );
-
-            };
-
-
-            page.appendChild(deleteButton);
-
-            pages.appendChild(page);
-
-        }
-
-    );
-
+    page.querySelector(".trash").addEventListener("click", event => {
+      event.stopPropagation();
+      deleteLeaderboard(page.dataset.id);
+    });
+  });
 }
-
-
-// ------------------------------------------
-// RENDER PLAYERS
-// ------------------------------------------
 
 function renderLeaderboard() {
+  const current = getCurrentLeaderboard();
+  const leaderboard = document.getElementById("leaderboard");
+  const empty = document.getElementById("empty");
 
-    const leaderboard =
-        getCurrentLeaderboard();
+  if (!current) {
+    leaderboard.innerHTML = "";
+    empty.classList.remove("hidden");
+    return;
+  }
 
+  const searchText = document
+    .getElementById("search")
+    .value
+    .toLowerCase()
+    .trim();
 
-    if (!leaderboard) {
+  const sortType = document.getElementById("sort").value;
 
-        return;
+  let players = [...current.players];
 
-    }
-
-
-    document.getElementById("title")
-        .textContent =
-        leaderboard.name;
-
-
-    document.getElementById("subtitle")
-        .textContent =
-        leaderboard.description;
-
-
-    const search =
-        document.getElementById("search")
-            .value
-            .toLowerCase()
-            .trim();
-
-
-    let players =
-        leaderboard.players.filter(
-
-            function(player) {
-
-                return player.name
-                    .toLowerCase()
-                    .includes(search);
-
-            }
-
-        );
-
-
-    // --------------------------------------
-    // SORT
-    // --------------------------------------
-
-    const sort =
-        document.getElementById("sort").value;
-
-
-    if (sort === "scoreDesc") {
-
-        players.sort(
-            (a, b) => b.score - a.score
-        );
-
-    }
-
-
-    if (sort === "scoreAsc") {
-
-        players.sort(
-            (a, b) => a.score - b.score
-        );
-
-    }
-
-
-    if (sort === "name") {
-
-        players.sort(
-            (a, b) =>
-                a.name.localeCompare(b.name)
-        );
-
-    }
-
-
-    const container =
-        document.getElementById("leaderboard");
-
-
-    container.innerHTML = "";
-
-
-    const empty =
-        document.getElementById("empty");
-
-
-    empty.classList.toggle(
-        "hidden",
-        players.length !== 0
+  if (searchText) {
+    players = players.filter(player =>
+      player.name.toLowerCase().includes(searchText)
     );
+  }
 
+  if (sortType === "scoreDesc") {
+    players.sort((a, b) => Number(b.score) - Number(a.score));
+  }
 
-    // --------------------------------------
-    // CREATE PLAYER ROWS
-    // --------------------------------------
+  if (sortType === "scoreAsc") {
+    players.sort((a, b) => Number(a.score) - Number(b.score));
+  }
 
-    players.forEach(
+  if (sortType === "name") {
+    players.sort((a, b) => a.name.localeCompare(b.name));
+  }
 
-        function(player, index) {
+  if (players.length === 0) {
+    leaderboard.innerHTML = "";
+    empty.classList.remove("hidden");
+    return;
+  }
 
-            const row =
-                document.createElement("div");
+  empty.classList.add("hidden");
 
-            row.className = "row";
+  leaderboard.innerHTML = players.map((player, index) => `
+    <div class="row">
+      <span class="rank">${index + 1}</span>
 
+      <span class="player">
+        ${escapeHTML(player.name)}
+      </span>
 
-            let rank;
+      <span class="score">
+        ${escapeHTML(player.score)}
+      </span>
 
+      <span class="actions">
+        <button class="secondary edit-player" data-id="${player.id}">
+          ✏ Edit
+        </button>
 
-            if (index === 0) {
+        <button class="danger delete-player" data-id="${player.id}">
+          🗑
+        </button>
+      </span>
+    </div>
+  `).join("");
 
-                rank = "🥇";
+  document.querySelectorAll(".edit-player").forEach(button => {
+    button.addEventListener("click", () => {
+      editPlayer(button.dataset.id);
+    });
+  });
 
-            }
-
-            else if (index === 1) {
-
-                rank = "🥈";
-
-            }
-
-            else if (index === 2) {
-
-                rank = "🥉";
-
-            }
-
-            else {
-
-                rank = "#" + (index + 1);
-
-            }
-
-
-            row.innerHTML = `
-
-                <div class="rank">
-                    ${rank}
-                </div>
-
-                <div class="player">
-                    ${escapeHTML(player.name)}
-                </div>
-
-                <div class="score">
-                    ${Number(player.score).toLocaleString()}
-                </div>
-
-                <div class="actions">
-
-                    <button
-                        class="secondary"
-                        onclick="editPlayer('${player.id}')"
-                    >
-                        Edit
-                    </button>
-
-                    <button
-                        class="danger"
-                        onclick="deletePlayer('${player.id}')"
-                    >
-                        Delete
-                    </button>
-
-                </div>
-
-            `;
-
-
-            container.appendChild(row);
-
-        }
-
-    );
-
+  document.querySelectorAll(".delete-player").forEach(button => {
+    button.addEventListener("click", () => {
+      deletePlayer(button.dataset.id);
+    });
+  });
 }
 
 
-// ------------------------------------------
-// ADD PLAYER
-// ------------------------------------------
+// -------------------------
+// PLAYER FUNCTIONS
+// -------------------------
 
-document.getElementById("addBtn").onclick =
-    function() {
+const playerDialog = document.getElementById("playerDialog");
+const playerForm = document.getElementById("playerForm");
 
-        document.getElementById("dialogTitle")
-            .textContent =
-            "Add Player";
+document.getElementById("addBtn").addEventListener("click", () => {
+  document.getElementById("dialogTitle").textContent = "Add Player";
+  document.getElementById("playerId").value = "";
+  document.getElementById("playerName").value = "";
+  document.getElementById("playerScore").value = "";
+
+  playerDialog.showModal();
+});
+
+playerForm.addEventListener("submit", event => {
+  event.preventDefault();
+
+  const current = getCurrentLeaderboard();
+
+  const id = document.getElementById("playerId").value;
+  const name = document.getElementById("playerName").value.trim();
+  const score = document.getElementById("playerScore").value;
+
+  if (!name || !score || !current) return;
+
+  if (id) {
+    const player = current.players.find(player => player.id === id);
+
+    if (player) {
+      player.name = name;
+      player.score = Number(score);
+    }
+  } else {
+    current.players.push({
+      id: createID(),
+      name,
+      score: Number(score)
+    });
+  }
+
+  saveData();
+  render();
+  playerDialog.close();
+});
+
+function editPlayer(id) {
+  const current = getCurrentLeaderboard();
+
+  if (!current) return;
+
+  const player = current.players.find(player => player.id === id);
+
+  if (!player) return;
+
+  document.getElementById("dialogTitle").textContent = "Edit Player";
+  document.getElementById("playerId").value = player.id;
+  document.getElementById("playerName").value = player.name;
+  document.getElementById("playerScore").value = player.score;
+
+  playerDialog.showModal();
+}
+
+function deletePlayer(id) {
+  const current = getCurrentLeaderboard();
+
+  if (!current) return;
+
+  const player = current.players.find(player => player.id === id);
+
+  if (!player) return;
+
+  if (!confirm(`Delete ${player.name}?`)) return;
+
+  current.players = current.players.filter(player => player.id !== id);
+
+  saveData();
+  render();
+}
 
 
-        document.getElementById("playerId")
-            .value = "";
+// -------------------------
+// LEADERBOARD PAGE FUNCTIONS
+// -------------------------
 
+const pageDialog = document.getElementById("pageDialog");
+const pageForm = document.getElementById("pageForm");
 
-        document.getElementById("playerName")
-            .value = "";
+document.getElementById("addPageBtn").addEventListener("click", () => {
+  pageDialogMode = "new";
 
+  document.getElementById("pageDialogTitle").textContent =
+    "New Leaderboard";
 
-        document.getElementById("playerScore")
-            .value = "";
+  document.getElementById("pageName").value = "";
+  document.getElementById("pageSubtitle").value = "";
 
+  pageDialog.showModal();
+});
 
-        document.getElementById("playerDialog")
-            .showModal();
+document.getElementById("renamePageBtn").addEventListener("click", () => {
+  const current = getCurrentLeaderboard();
 
+  if (!current) return;
+
+  pageDialogMode = "rename";
+
+  document.getElementById("pageDialogTitle").textContent =
+    "Rename Leaderboard";
+
+  document.getElementById("pageName").value = current.name;
+  document.getElementById("pageSubtitle").value = current.description;
+
+  pageDialog.showModal();
+});
+
+pageForm.addEventListener("submit", event => {
+  event.preventDefault();
+
+  const name = document.getElementById("pageName").value.trim();
+  const description =
+    document.getElementById("pageSubtitle").value.trim();
+
+  if (!name) return;
+
+  if (pageDialogMode === "rename") {
+    const current = getCurrentLeaderboard();
+
+    if (current) {
+      current.name = name;
+      current.description = description;
+    }
+  } else {
+    const newLeaderboard = {
+      id: createID(),
+      name,
+      description,
+      players: []
     };
 
+    data.leaderboards.push(newLeaderboard);
+    data.activeLeaderboard = newLeaderboard.id;
+  }
 
-// ------------------------------------------
-// SAVE PLAYER
-// ------------------------------------------
+  saveData();
+  render();
+  pageDialog.close();
+});
 
-document.getElementById("playerForm")
-    .addEventListener(
+function deleteLeaderboard(id) {
+  if (data.leaderboards.length <= 1) {
+    alert("You need to keep at least one leaderboard.");
+    return;
+  }
 
-        "submit",
+  const leaderboard = data.leaderboards.find(
+    leaderboard => leaderboard.id === id
+  );
 
-        function(event) {
+  if (!leaderboard) return;
 
-            event.preventDefault();
+  if (!confirm(`Delete "${leaderboard.name}"?`)) return;
 
+  data.leaderboards = data.leaderboards.filter(
+    leaderboard => leaderboard.id !== id
+  );
 
-            const leaderboard =
-                getCurrentLeaderboard();
+  if (data.activeLeaderboard === id) {
+    data.activeLeaderboard = data.leaderboards[0].id;
+  }
 
+  saveData();
+  render();
+}
 
-            const id =
-                document.getElementById("playerId")
-                    .value;
 
+// -------------------------
+// SEARCH + SORT
+// -------------------------
 
-            const name =
-                document.getElementById("playerName")
-                    .value
-                    .trim();
+document.getElementById("search").addEventListener("input", () => {
+  renderLeaderboard();
+});
 
+document.getElementById("sort").addEventListener("change", () => {
+  renderLeaderboard();
+});
 
-            const score =
-                Number(
-                    document.getElementById("playerScore")
-                        .value
-                );
 
-
-            if (!name) {
-
-                return;
-
-            }
-
-
-            if (Number.isNaN(score)) {
-
-                return;
-
-            }
-
-
-            // Editing existing player
-
-            if (id) {
-
-                const player =
-                    leaderboard.players.find(
-                        player =>
-                            player.id === id
-                    );
-
-
-                if (player) {
-
-                    player.name = name;
-
-                    player.score = score;
-
-                }
-
-            }
-
-
-            // Adding new player
-
-            else {
-
-                leaderboard.players.push({
-
-                    id: createID(),
-
-                    name: name,
-
-                    score: score
-
-                });
-
-            }
-
-
-            saveData();
-
-            render();
-
-
-            document.getElementById("playerDialog")
-                .close();
-
-        }
-
-    );
-
-
-// ------------------------------------------
-// EDIT PLAYER
-// ------------------------------------------
-
-window.editPlayer = function(id) {
-
-    const leaderboard =
-        getCurrentLeaderboard();
-
-
-    const player =
-        leaderboard.players.find(
-            player =>
-                player.id === id
-        );
-
-
-    if (!player) {
-
-        return;
-
-    }
-
-
-    document.getElementById("dialogTitle")
-        .textContent =
-        "Edit Player";
-
-
-    document.getElementById("playerId")
-        .value =
-        player.id;
-
-
-    document.getElementById("playerName")
-        .value =
-        player.name;
-
-
-    document.getElementById("playerScore")
-        .value =
-        player.score;
-
-
-    document.getElementById("playerDialog")
-        .showModal();
-
-};
-
-
-// ------------------------------------------
-// DELETE PLAYER
-// ------------------------------------------
-
-window.deletePlayer = function(id) {
-
-    const leaderboard =
-        getCurrentLeaderboard();
-
-
-    const player =
-        leaderboard.players.find(
-            player =>
-                player.id === id
-        );
-
-
-    if (!player) {
-
-        return;
-
-    }
-
-
-    const confirmed =
-        confirm(
-            "Delete " +
-            player.name +
-            "?"
-        );
-
-
-    if (!confirmed) {
-
-        return;
-
-    }
-
-
-    leaderboard.players =
-        leaderboard.players.filter(
-            player =>
-                player.id !== id
-        );
-
-
-    saveData();
-
-    render();
-
-};
-
-
-// ------------------------------------------
-// CREATE NEW LEADERBOARD
-// ------------------------------------------
-
-document.getElementById("addPageBtn")
-    .onclick = function() {
-
-        document.getElementById("pageDialogTitle")
-            .textContent =
-            "New Leaderboard";
-
-
-        document.getElementById("pageName")
-            .value = "";
-
-
-        document.getElementById("pageSubtitle")
-            .value = "";
-
-
-        document.getElementById("pageDialog")
-            .showModal();
-
-    };
-
-
-// ------------------------------------------
-// SAVE NEW LEADERBOARD
-// ------------------------------------------
-
-document.getElementById("pageForm")
-    .addEventListener(
-
-        "submit",
-
-        function(event) {
-
-            event.preventDefault();
-
-
-            const name =
-                document.getElementById("pageName")
-                    .value
-                    .trim();
-
-
-            const description =
-                document.getElementById("pageSubtitle")
-                    .value
-                    .trim();
-
-
-            if (!name) {
-
-                return;
-
-            }
-
-
-            const newLeaderboard = {
-
-                id: createID(),
-
-                name: name,
-
-                description:
-                    description ||
-                    "Leaderboard",
-
-                players: []
-
-            };
-
-
-            data.leaderboards.push(
-                newLeaderboard
-            );
-
-
-            data.activeLeaderboard =
-                newLeaderboard.id;
-
-
-            saveData();
-
-            render();
-
-
-            document.getElementById("pageDialog")
-                .close();
-
-        }
-
-    );
-
-
-// ------------------------------------------
-// RENAME LEADERBOARD
-// ------------------------------------------
-
-document.getElementById("renamePageBtn")
-    .onclick = function() {
-
-        const leaderboard =
-            getCurrentLeaderboard();
-
-
-        if (!leaderboard) {
-
-            return;
-
-        }
-
-
-        document.getElementById("pageDialogTitle")
-            .textContent =
-            "Edit Leaderboard";
-
-
-        document.getElementById("pageName")
-            .value =
-            leaderboard.name;
-
-
-        document.getElementById("pageSubtitle")
-            .value =
-            leaderboard.description;
-
-
-        document.getElementById("pageDialog")
-            .showModal();
-
-    };
-
-
-// ------------------------------------------
-// SAVE RENAMED LEADERBOARD
-// ------------------------------------------
-
-document.getElementById("pageForm")
-    .addEventListener(
-
-        "close",
-
-        function() {
-
-            // Nothing needed here.
-            // The submit handler above
-            // handles saving.
-
-        }
-
-    );
-
-
-// We need to detect rename separately.
-// This listener handles the dialog's save button.
-
-document.getElementById("pageDialog")
-    .addEventListener(
-
-        "submit",
-
-        function() {
-
-            const leaderboard =
-                getCurrentLeaderboard();
-
-
-            if (!leaderboard) {
-
-                return;
-
-            }
-
-
-            // If the current leaderboard
-            // already has players and the dialog
-            // was opened with Rename, update it.
-
-        }
-
-    );
-
-
-// ------------------------------------------
-// SEARCH
-// ------------------------------------------
-
-document.getElementById("search")
-    .addEventListener(
-
-        "input",
-
-        function() {
-
-            renderLeaderboard();
-
-        }
-
-    );
-
-
-// ------------------------------------------
-// SORT
-// ------------------------------------------
-
-document.getElementById("sort")
-    .addEventListener(
-
-        "change",
-
-        function() {
-
-            renderLeaderboard();
-
-        }
-
-    );
-
-
-// ------------------------------------------
-// INITIAL DISPLAY
-// ------------------------------------------
+// -------------------------
+// START
+// -------------------------
 
 render();
