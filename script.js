@@ -1112,9 +1112,9 @@ async function deleteLeaderboard(id) {
 
     console.error(error);
 
-    alert(
-      "Could not delete leaderboard."
-    );
+   alert(
+  `Could not create leaderboard:\n${error.message}\nCode: ${error.code}`
+);
 
     return;
   }
