@@ -963,3 +963,6 @@ dialog::backdrop {
     }
 
 }
+.folder-pages.collapsed {
+  display: none !important;
+}
