@@ -22,7 +22,6 @@ let players = [];
 
 let currentLeaderboardId = null;
 let pageDialogMode = "new";
-let collapsedFolders = new Set();
 
 // ==============================
 // ELEMENTS
@@ -335,21 +334,22 @@ function renderPages() {
     folderBox.appendChild(folderPages);
 
     // COLLAPSE / EXPAND FOLDER
-    folderHeader.addEventListener(
-      "click",
-      event => {
+    // FIXED: directly hides/shows the folder pages
+    folderHeader.addEventListener("click", event => {
 
-        if (
-          event.target.classList.contains(
-            "folder-delete"
-          )
-        ) {
-          return;
-        }
+      if (
+        event.target.classList.contains("folder-delete")
+      ) {
+        return;
+      }
 
-        folderPages.classList.toggle(
-          "collapsed"
-        );
+      const isCollapsed =
+        folderPages.style.display === "none";
+
+      if (isCollapsed) {
+
+        folderPages.style.display =
+          "block";
 
         const arrow =
           folderHeader.querySelector(
@@ -357,51 +357,22 @@ function renderPages() {
           );
 
         arrow.textContent =
-          folderPages.classList.contains(
-            "collapsed"
-          )
-            ? "▶"
-            : "▼";
+          "▼";
+
+      } else {
+
+        folderPages.style.display =
+          "none";
+
+        const arrow =
+          folderHeader.querySelector(
+            ".folder-arrow"
+          );
+
+        arrow.textContent =
+          "▶";
       }
-    );// COLLAPSE / EXPAND FOLDER
-if (collapsedFolders.has(folder.id)) {
-  folderPages.classList.add("collapsed");
-  folderPages.style.display = "none";
-}
-
-const arrow =
-  folderHeader.querySelector(".folder-arrow");
-
-arrow.textContent =
-  collapsedFolders.has(folder.id)
-    ? "▶"
-    : "▼";
-
-folderHeader.addEventListener(
-  "click",
-  event => {
-
-    if (
-      event.target.classList.contains(
-        "folder-delete"
-      )
-    ) {
-      return;
-    }
-
-    if (collapsedFolders.has(folder.id)) {
-      collapsedFolders.delete(folder.id);
-      folderPages.classList.remove("collapsed");
-      folderPages.style.display = "";
-      arrow.textContent = "▼";
-    } else {
-      collapsedFolders.add(folder.id);
-      folderPages.classList.add("collapsed");
-      folderPages.style.display = "none";
-      arrow.textContent = "▶";
-    }
-  }
-);
+    });
 
     // DELETE FOLDER
     folderHeader
@@ -1151,9 +1122,9 @@ async function deleteLeaderboard(id) {
 
     console.error(error);
 
-   alert(
-  `Could not create leaderboard:\n${error.message}\nCode: ${error.code}`
-);
+    alert(
+      `Could not create leaderboard:\n${error.message}\nCode: ${error.code}`
+    );
 
     return;
   }
