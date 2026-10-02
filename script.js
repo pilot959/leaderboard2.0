@@ -12,15 +12,15 @@ const db = window.supabase.createClient(
   SUPABASE_KEY
 );
 
-
 // ==============================
 // STATE
 // ==============================
 
+let folders = [];
 let leaderboards = [];
 let players = [];
-let currentLeaderboardId = null;
 
+let currentLeaderboardId = null;
 let pageDialogMode = "new";
 
 
@@ -69,13 +69,63 @@ function getCurrentLeaderboard() {
   );
 }
 
+function getCurrentFolder() {
+  const leaderboard = getCurrentLeaderboard();
+
+  if (!leaderboard) return null;
+
+  return folders.find(
+    folder => folder.id === leaderboard.folder_id
+  );
+}
+
 
 // ==============================
-// LOAD EVERYTHING
+// LOAD DATA
 // ==============================
 
 async function loadData() {
 
+  // Load folders
+  const { data: folderData, error: folderError } =
+    await db
+      .from("folders")
+      .select("*")
+      .order("name");
+
+  if (folderError) {
+    console.error(folderError);
+    alert("Could not load folders.");
+    return;
+  }
+
+  folders = folderData || [];
+
+
+  // Safety: create a folder if none exist
+  if (folders.length === 0) {
+
+    const { data, error } =
+      await db
+        .from("folders")
+        .insert({
+          id: createID(),
+          name: "My Tracks"
+        })
+        .select()
+        .single();
+
+    if (error) {
+      console.error(error);
+      alert("Could not create the first folder.");
+      return;
+    }
+
+    folders = [data];
+  }
+
+
+  // Load leaderboards
   const { data: leaderboardData, error: leaderboardError } =
     await db
       .from("leaderboards")
@@ -91,7 +141,27 @@ async function loadData() {
   leaderboards = leaderboardData || [];
 
 
-  // Create first leaderboard if none exist
+  // Safety: if any leaderboard somehow has no folder,
+  // put it in the first folder.
+  const firstFolder = folders[0];
+
+  for (const leaderboard of leaderboards) {
+
+    if (!leaderboard.folder_id) {
+
+      await db
+        .from("leaderboards")
+        .update({
+          folder_id: firstFolder.id
+        })
+        .eq("id", leaderboard.id);
+
+      leaderboard.folder_id = firstFolder.id;
+    }
+  }
+
+
+  // Create a first leaderboard if there are none
   if (leaderboards.length === 0) {
 
     const id = createID();
@@ -101,6 +171,7 @@ async function loadData() {
         .from("leaderboards")
         .insert({
           id: id,
+          folder_id: firstFolder.id,
           name: "Speedruns",
           description: "Best times"
         })
@@ -167,52 +238,178 @@ function render() {
 
 
 // ==============================
-// LEADERBOARD PAGES
+// RENDER FOLDERS + LEADERBOARDS
 // ==============================
 
 function renderPages() {
 
-  pagesEl.innerHTML = leaderboards.map(leaderboard => `
-    <div
-      class="page ${
-        leaderboard.id === currentLeaderboardId ? "active" : ""
-      }"
-      data-id="${leaderboard.id}"
-    >
+  pagesEl.innerHTML = "";
 
-      <span class="dot"></span>
 
-      <span class="page-name">
-        ${escapeHTML(leaderboard.name)}
+  folders.forEach(folder => {
+
+    const folderBox = document.createElement("div");
+
+    folderBox.className = "folder";
+
+
+    const folderHeader = document.createElement("div");
+
+    folderHeader.className = "folder-header";
+
+
+    folderHeader.innerHTML = `
+      <span class="folder-arrow">▼</span>
+      <span class="folder-icon">📁</span>
+      <span class="folder-name">
+        ${escapeHTML(folder.name)}
       </span>
 
       <button
-        class="trash"
-        title="Delete leaderboard"
+        class="folder-delete"
+        title="Delete empty folder"
       >
         🗑
       </button>
-
-    </div>
-  `).join("");
+    `;
 
 
-  document.querySelectorAll(".page").forEach(page => {
+    folderBox.appendChild(folderHeader);
 
-    page.addEventListener("click", async event => {
 
-      if (event.target.classList.contains("trash")) {
-        event.stopPropagation();
-        await deleteLeaderboard(page.dataset.id);
-        return;
-      }
+    const folderPages = document.createElement("div");
 
-      currentLeaderboardId = page.dataset.id;
+    folderPages.className = "folder-pages";
 
-      await loadData();
+
+    const folderLeaderboards =
+      leaderboards.filter(
+        leaderboard =>
+          leaderboard.folder_id === folder.id
+      );
+
+
+    folderLeaderboards.forEach(leaderboard => {
+
+      const page = document.createElement("div");
+
+      page.className =
+        "page" +
+        (
+          leaderboard.id === currentLeaderboardId
+            ? " active"
+            : ""
+        );
+
+
+      page.dataset.id = leaderboard.id;
+
+
+      page.innerHTML = `
+        <span class="dot"></span>
+
+        <span class="page-name">
+          ${escapeHTML(leaderboard.name)}
+        </span>
+
+        <button
+          class="trash"
+          title="Delete leaderboard"
+        >
+          🗑
+        </button>
+      `;
+
+
+      page.addEventListener("click", async event => {
+
+        if (
+          event.target.classList.contains("trash")
+        ) {
+          event.stopPropagation();
+
+          await deleteLeaderboard(
+            leaderboard.id
+          );
+
+          return;
+        }
+
+
+        currentLeaderboardId =
+          leaderboard.id;
+
+        await loadData();
+      });
+
+
+      folderPages.appendChild(page);
     });
 
+
+    folderBox.appendChild(folderPages);
+
+
+    // Collapse / expand folder
+    folderHeader.addEventListener(
+      "click",
+      async event => {
+
+        if (
+          event.target.classList.contains(
+            "folder-delete"
+          )
+        ) {
+          return;
+        }
+
+        folderPages.classList.toggle("collapsed");
+
+        const arrow =
+          folderHeader.querySelector(
+            ".folder-arrow"
+          );
+
+        arrow.textContent =
+          folderPages.classList.contains("collapsed")
+            ? "▶"
+            : "▼";
+      }
+    );
+
+
+    // Delete folder
+    folderHeader
+      .querySelector(".folder-delete")
+      .addEventListener("click", async event => {
+
+        event.stopPropagation();
+
+        await deleteFolder(folder.id);
+      });
+
+
+    pagesEl.appendChild(folderBox);
   });
+
+
+  // New folder button
+  const newFolderButton =
+    document.createElement("button");
+
+  newFolderButton.className = "add-page";
+
+  newFolderButton.textContent =
+    "＋ New Folder";
+
+
+  newFolderButton.addEventListener(
+    "click",
+    createFolder
+  );
+
+
+  pagesEl.appendChild(newFolderButton);
 }
 
 
@@ -226,13 +423,18 @@ function renderLeaderboard() {
     searchEl.value.toLowerCase().trim();
 
 
-  let filteredPlayers = [...players];
+  let filteredPlayers =
+    [...players];
 
 
   if (searchText) {
-    filteredPlayers = filteredPlayers.filter(player =>
-      player.name.toLowerCase().includes(searchText)
-    );
+
+    filteredPlayers =
+      filteredPlayers.filter(player =>
+        player.name
+          .toLowerCase()
+          .includes(searchText)
+      );
   }
 
 
@@ -247,7 +449,9 @@ function renderLeaderboard() {
 
 
   if (filteredPlayers.length === 0) {
+
     emptyEl.classList.remove("hidden");
+
     return;
   }
 
@@ -256,7 +460,8 @@ function renderLeaderboard() {
 
 
   leaderboardEl.innerHTML =
-    filteredPlayers.map((player, index) => `
+    filteredPlayers.map(
+      (player, index) => `
 
       <div class="row">
 
@@ -292,25 +497,34 @@ function renderLeaderboard() {
 
       </div>
 
-    `).join("");
+    `
+    ).join("");
 
 
-  document.querySelectorAll(".edit-player")
+  document
+    .querySelectorAll(".edit-player")
     .forEach(button => {
 
-      button.addEventListener("click", () => {
-        editPlayer(button.dataset.id);
-      });
+      button.addEventListener(
+        "click",
+        () => {
+          editPlayer(button.dataset.id);
+        }
+      );
 
     });
 
 
-  document.querySelectorAll(".delete-player")
+  document
+    .querySelectorAll(".delete-player")
     .forEach(button => {
 
-      button.addEventListener("click", () => {
-        deletePlayer(button.dataset.id);
-      });
+      button.addEventListener(
+        "click",
+        () => {
+          deletePlayer(button.dataset.id);
+        }
+      );
 
     });
 }
@@ -322,12 +536,25 @@ function renderLeaderboard() {
 
 addBtn.addEventListener("click", () => {
 
-  document.getElementById("dialogTitle").textContent =
-    "Add Player";
+  document.getElementById(
+    "dialogTitle"
+  ).textContent = "Add Player";
 
-  document.getElementById("playerId").value = "";
-  document.getElementById("playerName").value = "";
-  document.getElementById("playerScore").value = "";
+
+  document.getElementById(
+    "playerId"
+  ).value = "";
+
+
+  document.getElementById(
+    "playerName"
+  ).value = "";
+
+
+  document.getElementById(
+    "playerScore"
+  ).value = "";
+
 
   playerDialog.showModal();
 });
@@ -337,69 +564,96 @@ addBtn.addEventListener("click", () => {
 // SAVE PLAYER
 // ==============================
 
-playerForm.addEventListener("submit", async event => {
+playerForm.addEventListener(
+  "submit",
+  async event => {
 
-  event.preventDefault();
-
-
-  const id =
-    document.getElementById("playerId").value;
-
-  const name =
-    document.getElementById("playerName").value.trim();
-
-  const score =
-    Number(document.getElementById("playerScore").value);
+    event.preventDefault();
 
 
-  if (!name || !Number.isFinite(score)) {
-    return;
-  }
+    const id =
+      document.getElementById(
+        "playerId"
+      ).value;
 
 
-  if (id) {
-
-    const { error } =
-      await db
-        .from("players")
-        .update({
-          name: name,
-          score: score
-        })
-        .eq("id", id);
+    const name =
+      document.getElementById(
+        "playerName"
+      ).value.trim();
 
 
-    if (error) {
-      console.error(error);
-      alert("Could not update player.");
+    const score =
+      Number(
+        document.getElementById(
+          "playerScore"
+        ).value
+      );
+
+
+    if (
+      !name ||
+      !Number.isFinite(score)
+    ) {
       return;
     }
 
-  } else {
 
-    const { error } =
-      await db
-        .from("players")
-        .insert({
-          id: createID(),
-          leaderboard_id: currentLeaderboardId,
-          name: name,
-          score: score
-        });
+    if (id) {
+
+      const { error } =
+        await db
+          .from("players")
+          .update({
+            name: name,
+            score: score
+          })
+          .eq("id", id);
 
 
-    if (error) {
-      console.error(error);
-      alert("Could not add player.");
-      return;
+      if (error) {
+
+        console.error(error);
+
+        alert(
+          "Could not update player."
+        );
+
+        return;
+      }
+
+    } else {
+
+      const { error } =
+        await db
+          .from("players")
+          .insert({
+            id: createID(),
+            leaderboard_id:
+              currentLeaderboardId,
+            name: name,
+            score: score
+          });
+
+
+      if (error) {
+
+        console.error(error);
+
+        alert(
+          "Could not add player."
+        );
+
+        return;
+      }
     }
+
+
+    playerDialog.close();
+
+    await loadData();
   }
-
-
-  playerDialog.close();
-
-  await loadData();
-});
+);
 
 
 // ==============================
@@ -409,22 +663,32 @@ playerForm.addEventListener("submit", async event => {
 function editPlayer(id) {
 
   const player =
-    players.find(player => player.id === id);
+    players.find(
+      player => player.id === id
+    );
+
 
   if (!player) return;
 
 
-  document.getElementById("dialogTitle").textContent =
-    "Edit Player";
+  document.getElementById(
+    "dialogTitle"
+  ).textContent = "Edit Player";
 
-  document.getElementById("playerId").value =
-    player.id;
 
-  document.getElementById("playerName").value =
-    player.name;
+  document.getElementById(
+    "playerId"
+  ).value = player.id;
 
-  document.getElementById("playerScore").value =
-    player.score;
+
+  document.getElementById(
+    "playerName"
+  ).value = player.name;
+
+
+  document.getElementById(
+    "playerScore"
+  ).value = player.score;
 
 
   playerDialog.showModal();
@@ -438,12 +702,19 @@ function editPlayer(id) {
 async function deletePlayer(id) {
 
   const player =
-    players.find(player => player.id === id);
+    players.find(
+      player => player.id === id
+    );
+
 
   if (!player) return;
 
 
-  if (!confirm(`Delete ${player.name}?`)) {
+  if (
+    !confirm(
+      `Delete ${player.name}?`
+    )
+  ) {
     return;
   }
 
@@ -456,8 +727,13 @@ async function deletePlayer(id) {
 
 
   if (error) {
+
     console.error(error);
-    alert("Could not delete player.");
+
+    alert(
+      "Could not delete player."
+    );
+
     return;
   }
 
@@ -467,125 +743,373 @@ async function deletePlayer(id) {
 
 
 // ==============================
+// CREATE FOLDER
+// ==============================
+
+async function createFolder() {
+
+  const name =
+    prompt("Folder name:");
+
+
+  if (!name || !name.trim()) {
+    return;
+  }
+
+
+  const { error } =
+    await db
+      .from("folders")
+      .insert({
+        id: createID(),
+        name: name.trim()
+      });
+
+
+  if (error) {
+
+    console.error(error);
+
+    alert(
+      "Could not create folder."
+    );
+
+    return;
+  }
+
+
+  await loadData();
+}
+
+
+// ==============================
+// DELETE FOLDER
+// ==============================
+
+async function deleteFolder(id) {
+
+  const folder =
+    folders.find(
+      folder => folder.id === id
+    );
+
+
+  if (!folder) return;
+
+
+  const folderLeaderboards =
+    leaderboards.filter(
+      leaderboard =>
+        leaderboard.folder_id === id
+    );
+
+
+  // Don't let a folder delete tracks
+  if (folderLeaderboards.length > 0) {
+
+    alert(
+      "This folder still contains leaderboards. Move or delete them first."
+    );
+
+    return;
+  }
+
+
+  if (
+    !confirm(
+      `Delete folder "${folder.name}"?`
+    )
+  ) {
+    return;
+  }
+
+
+  const { error } =
+    await db
+      .from("folders")
+      .delete()
+      .eq("id", id);
+
+
+  if (error) {
+
+    console.error(error);
+
+    alert(
+      "Could not delete folder."
+    );
+
+    return;
+  }
+
+
+  await loadData();
+}
+
+
+// ==============================
+// ADD FOLDER SELECT TO DIALOG
+// ==============================
+
+function setupFolderSelector() {
+
+  if (
+    document.getElementById(
+      "leaderboardFolder"
+    )
+  ) {
+    return;
+  }
+
+
+  const nameInput =
+    document.getElementById(
+      "pageName"
+    );
+
+
+  const label =
+    document.createElement("label");
+
+
+  label.id =
+    "folderSelectorLabel";
+
+
+  label.innerHTML = `
+    Folder
+
+    <select id="leaderboardFolder">
+    </select>
+  `;
+
+
+  nameInput.parentElement.after(label);
+}
+
+
+// ==============================
+// UPDATE FOLDER SELECT
+// ==============================
+
+function updateFolderSelector(
+  selectedFolderId = null
+) {
+
+  setupFolderSelector();
+
+
+  const select =
+    document.getElementById(
+      "leaderboardFolder"
+    );
+
+
+  select.innerHTML =
+    folders.map(folder => `
+      <option
+        value="${folder.id}"
+        ${
+          folder.id === selectedFolderId
+            ? "selected"
+            : ""
+        }
+      >
+        ${escapeHTML(folder.name)}
+      </option>
+    `).join("");
+}
+
+
+// ==============================
 // NEW LEADERBOARD
 // ==============================
 
-addPageBtn.addEventListener("click", () => {
+addPageBtn.addEventListener(
+  "click",
+  () => {
 
-  pageDialogMode = "new";
+    pageDialogMode = "new";
 
-  document.getElementById("pageDialogTitle").textContent =
-    "New Leaderboard";
 
-  document.getElementById("pageName").value = "";
-  document.getElementById("pageSubtitle").value = "";
+    document.getElementById(
+      "pageDialogTitle"
+    ).textContent =
+      "New Leaderboard";
 
-  pageDialog.showModal();
-});
+
+    document.getElementById(
+      "pageName"
+    ).value = "";
+
+
+    document.getElementById(
+      "pageSubtitle"
+    ).value = "";
+
+
+    updateFolderSelector(
+      folders[0]?.id
+    );
+
+
+    pageDialog.showModal();
+  }
+);
 
 
 // ==============================
-// RENAME LEADERBOARD
+// RENAME / MOVE LEADERBOARD
 // ==============================
 
-renamePageBtn.addEventListener("click", () => {
+renamePageBtn.addEventListener(
+  "click",
+  () => {
 
-  const current =
-    getCurrentLeaderboard();
-
-  if (!current) return;
-
-
-  pageDialogMode = "rename";
-
-  document.getElementById("pageDialogTitle").textContent =
-    "Rename Leaderboard";
-
-  document.getElementById("pageName").value =
-    current.name;
-
-  document.getElementById("pageSubtitle").value =
-    current.description || "";
+    const current =
+      getCurrentLeaderboard();
 
 
-  pageDialog.showModal();
-});
+    if (!current) return;
+
+
+    pageDialogMode = "rename";
+
+
+    document.getElementById(
+      "pageDialogTitle"
+    ).textContent =
+      "Rename / Move Leaderboard";
+
+
+    document.getElementById(
+      "pageName"
+    ).value =
+      current.name;
+
+
+    document.getElementById(
+      "pageSubtitle"
+    ).value =
+      current.description || "";
+
+
+    updateFolderSelector(
+      current.folder_id
+    );
+
+
+    pageDialog.showModal();
+  }
+);
 
 
 // ==============================
 // SAVE LEADERBOARD
 // ==============================
 
-pageForm.addEventListener("submit", async event => {
+pageForm.addEventListener(
+  "submit",
+  async event => {
 
-  event.preventDefault();
-
-
-  const name =
-    document.getElementById("pageName").value.trim();
-
-  const description =
-    document.getElementById("pageSubtitle").value.trim();
+    event.preventDefault();
 
 
-  if (!name) return;
+    const name =
+      document.getElementById(
+        "pageName"
+      ).value.trim();
 
 
-  // RENAME
-  if (pageDialogMode === "rename") {
-
-    const { error } =
-      await db
-        .from("leaderboards")
-        .update({
-          name: name,
-          description: description
-        })
-        .eq("id", currentLeaderboardId);
+    const description =
+      document.getElementById(
+        "pageSubtitle"
+      ).value.trim();
 
 
-    if (error) {
-      console.error(error);
-      alert("Could not rename leaderboard.");
-      return;
-    }
-
-  }
-
-  // NEW LEADERBOARD
-  else {
-
-    const newID = createID();
+    const folderId =
+      document.getElementById(
+        "leaderboardFolder"
+      ).value;
 
 
-    const { error } =
-      await db
-        .from("leaderboards")
-        .insert({
-          id: newID,
-          name: name,
-          description: description
-        });
-
-
-    if (error) {
-      console.error(error);
-      alert("Could not create leaderboard.");
+    if (!name || !folderId) {
       return;
     }
 
 
-    currentLeaderboardId = newID;
+    // RENAME / MOVE
+    if (
+      pageDialogMode === "rename"
+    ) {
+
+      const { error } =
+        await db
+          .from("leaderboards")
+          .update({
+            name: name,
+            description: description,
+            folder_id: folderId
+          })
+          .eq(
+            "id",
+            currentLeaderboardId
+          );
+
+
+      if (error) {
+
+        console.error(error);
+
+        alert(
+          "Could not update leaderboard."
+        );
+
+        return;
+      }
+
+    }
+
+    // NEW
+    else {
+
+      const newID =
+        createID();
+
+
+      const { error } =
+        await db
+          .from("leaderboards")
+          .insert({
+            id: newID,
+            folder_id: folderId,
+            name: name,
+            description: description
+          });
+
+
+      if (error) {
+
+        console.error(error);
+
+        alert(
+          "Could not create leaderboard."
+        );
+
+        return;
+      }
+
+
+      currentLeaderboardId =
+        newID;
+    }
+
+
+    pageDialog.close();
+
+    await loadData();
   }
-
-
-  // CLOSE THE POPUP
-  pageDialog.close();
-
-
-  // REFRESH THE SITE
-  await loadData();
-});
+);
 
 
 // ==============================
@@ -594,21 +1118,33 @@ pageForm.addEventListener("submit", async event => {
 
 async function deleteLeaderboard(id) {
 
-  if (leaderboards.length <= 1) {
-    alert("You need to keep at least one leaderboard.");
+  if (
+    leaderboards.length <= 1
+  ) {
+
+    alert(
+      "You need to keep at least one leaderboard."
+    );
+
     return;
   }
 
 
   const leaderboard =
     leaderboards.find(
-      leaderboard => leaderboard.id === id
+      leaderboard =>
+        leaderboard.id === id
     );
+
 
   if (!leaderboard) return;
 
 
-  if (!confirm(`Delete "${leaderboard.name}"?`)) {
+  if (
+    !confirm(
+      `Delete "${leaderboard.name}"?`
+    )
+  ) {
     return;
   }
 
@@ -621,13 +1157,20 @@ async function deleteLeaderboard(id) {
 
 
   if (error) {
+
     console.error(error);
-    alert("Could not delete leaderboard.");
+
+    alert(
+      "Could not delete leaderboard."
+    );
+
     return;
   }
 
 
-  currentLeaderboardId = null;
+  currentLeaderboardId =
+    null;
+
 
   await loadData();
 }
@@ -637,16 +1180,21 @@ async function deleteLeaderboard(id) {
 // SEARCH
 // ==============================
 
-searchEl.addEventListener("input", () => {
-  renderLeaderboard();
-});
+searchEl.addEventListener(
+  "input",
+  () => {
+    renderLeaderboard();
+  }
+);
 
 
 // ==============================
 // REMOVE OLD SORT DROPDOWN
 // ==============================
 
-const oldSort = document.getElementById("sort");
+const oldSort =
+  document.getElementById("sort");
+
 
 if (oldSort) {
   oldSort.parentElement.remove();
@@ -660,7 +1208,9 @@ if (oldSort) {
 loadData();
 
 
-// Refresh every 5 seconds so friends'
-// changes appear automatically.
+// Refresh every 5 seconds
 
-setInterval(loadData, 5000);
+setInterval(
+  loadData,
+  5000
+);
