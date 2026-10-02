@@ -22,6 +22,7 @@ let players = [];
 
 let currentLeaderboardId = null;
 let pageDialogMode = "new";
+let collapsedFolders = new Set();
 
 // ==============================
 // ELEMENTS
@@ -362,7 +363,45 @@ function renderPages() {
             ? "▶"
             : "▼";
       }
-    );
+    );// COLLAPSE / EXPAND FOLDER
+if (collapsedFolders.has(folder.id)) {
+  folderPages.classList.add("collapsed");
+  folderPages.style.display = "none";
+}
+
+const arrow =
+  folderHeader.querySelector(".folder-arrow");
+
+arrow.textContent =
+  collapsedFolders.has(folder.id)
+    ? "▶"
+    : "▼";
+
+folderHeader.addEventListener(
+  "click",
+  event => {
+
+    if (
+      event.target.classList.contains(
+        "folder-delete"
+      )
+    ) {
+      return;
+    }
+
+    if (collapsedFolders.has(folder.id)) {
+      collapsedFolders.delete(folder.id);
+      folderPages.classList.remove("collapsed");
+      folderPages.style.display = "";
+      arrow.textContent = "▼";
+    } else {
+      collapsedFolders.add(folder.id);
+      folderPages.classList.add("collapsed");
+      folderPages.style.display = "none";
+      arrow.textContent = "▶";
+    }
+  }
+);
 
     // DELETE FOLDER
     folderHeader
