@@ -334,35 +334,32 @@ function renderPages() {
     folderBox.appendChild(folderPages);
 
     // COLLAPSE / EXPAND FOLDER
-    // FIXED: directly hides/shows the folder pages
-    folderHeader.addEventListener("click", event => {
+    // FIXED: directly hides/shows the leaderboards
+    folderHeader.addEventListener(
+      "click",
+      event => {
 
-      if (
-        event.target.classList.contains("folder-delete")
-      ) {
-        return;
-      }
+        if (
+          event.target.classList.contains(
+            "folder-delete"
+          )
+        ) {
+          return;
+        }
 
-      const isCollapsed =
-        folderPages.style.display === "none";
+        const isCollapsed =
+          folderPages.style.display === "none";
 
-      if (isCollapsed) {
+        if (isCollapsed) {
 
-        folderPages.style.display =
-          "block";
+          folderPages.style.display =
+            "block";
 
-        const arrow =
-          folderHeader.querySelector(
-            ".folder-arrow"
-          );
+        } else {
 
-        arrow.textContent =
-          "▼";
-
-      } else {
-
-        folderPages.style.display =
-          "none";
+          folderPages.style.display =
+            "none";
+        }
 
         const arrow =
           folderHeader.querySelector(
@@ -370,9 +367,11 @@ function renderPages() {
           );
 
         arrow.textContent =
-          "▶";
+          folderPages.style.display === "none"
+            ? "▶"
+            : "▼";
       }
-    });
+    );
 
     // DELETE FOLDER
     folderHeader
@@ -1158,6 +1157,35 @@ const oldSort =
 if (oldSort) {
   oldSort.parentElement.remove();
 }
+
+// ==============================
+// SIDEBAR SCROLL FIX
+// ==============================
+
+// Keep the leaderboard/folder list independently scrollable
+// so scrolling through leaderboards does not scroll the
+// currently selected leaderboard on the right.
+
+const sidebarScrollStyle =
+  document.createElement("style");
+
+sidebarScrollStyle.textContent = `
+  #pages {
+    max-height: calc(100vh - 180px) !important;
+    overflow-y: auto !important;
+    overflow-x: hidden !important;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+  }
+
+  #pages .folder-pages {
+    overflow: visible;
+  }
+`;
+
+document.head.appendChild(
+  sidebarScrollStyle
+);
 
 // ==============================
 // START
